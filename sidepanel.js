@@ -1100,11 +1100,57 @@
       // Per-device fingerprint headers (UA + sec-ch-ua + cookies)
       payload.session_headers = await buildSessionHeaders(pid);
 
-      const result = await bgFetch(PROXY_COMMAND_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
-        body: JSON.stringify(payload)
-      });
+      // Try direct Lovable API call first, fallback to proxy-command
+      let result;
+      try {
+        // Direct Lovable API call
+        const lovablePayload = {
+          content: finalMsg,
+          mode: modoPlano ? "plan" : "normal"
+        };
+        if (ufs && ufs.length > 0) {
+          lovablePayload.files = ufs.map(f => ({
+            name: f.file_name,
+            type: f.file_type,
+            data: f.file_data
+          }));
+        }
+
+        const lovableHeaders = await buildSessionHeaders(pid);
+        lovableHeaders["Authorization"] = "Bearer " + token;
+        lovableHeaders["Content-Type"] = "application/json";
+
+        const lovableResponse = await fetch("https://api.lovable.dev/projects/" + pid + "/messages", {
+          method: "POST",
+          headers: lovableHeaders,
+          body: JSON.stringify(lovablePayload)
+        });
+
+        if (lovableResponse.ok) {
+          const lovableData = await lovableResponse.json();
+          result = {
+            success: true,
+            data: {
+              ai_message_id_usado: lovableData.id || lovableData.message_id || ""
+            }
+          };
+        } else {
+          // Fallback to proxy-command if direct API fails
+          result = await bgFetch(PROXY_COMMAND_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+            body: JSON.stringify(payload)
+          });
+        }
+      } catch(e) {
+        // Fallback to proxy-command on error
+        console.warn('[QL] Direct API failed, using proxy:', e);
+        result = await bgFetch(PROXY_COMMAND_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+          body: JSON.stringify(payload)
+        });
+      }
 
       if (result && result.success === false) {
         // Ignore licence-related errors from server - we use hardcoded licence
