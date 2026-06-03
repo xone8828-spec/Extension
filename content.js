@@ -1856,8 +1856,8 @@ function setupSend(){
 
       // Build payload for proxy-command (handles everything server-side)
       const payload = {
-        license_key: TECHVAI_HARDCODED_LICENSE,
-        session_id: TECHVAI_HARDCODED_LICENSE,
+        license_key: licenseKey || "",
+        session_id: licenseKey || "",
         projeto_id: projectId,
         token_lovable: token,
         mensagem: finalMensagem,
@@ -1884,58 +1884,11 @@ function setupSend(){
       // Per-device fingerprint headers
       payload.session_headers = await buildSessionHeaders(projectId);
 
-      // Try direct Lovable API call first, fallback to proxy-command
-      let result;
-      try {
-        // Direct Lovable API call
-        const lovablePayload = {
-          content: finalMensagem,
-          mode: modoPlano ? "plan" : "normal",
-          model: activeModel
-        };
-        if (v2Pending.length > 0) {
-          lovablePayload.files = payload.upload_files.map(f => ({
-            name: f.file_name,
-            type: f.file_type,
-            data: f.file_data
-          }));
-        }
-
-        const lovableHeaders = await buildSessionHeaders(projectId);
-        lovableHeaders["Authorization"] = "Bearer " + token;
-        lovableHeaders["Content-Type"] = "application/json";
-
-        const lovableResponse = await fetch("https://api.lovable.dev/projects/" + projectId + "/messages", {
-          method: "POST",
-          headers: lovableHeaders,
-          body: JSON.stringify(lovablePayload)
-        });
-
-        if (lovableResponse.ok) {
-          const lovableData = await lovableResponse.json();
-          result = {
-            success: true,
-            data: {
-              ai_message_id_usado: lovableData.id || lovableData.message_id || ""
-            }
-          };
-        } else {
-          // Fallback to proxy-command if direct API fails
-          result = await bgFetch(PROXY_COMMAND_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-            body: JSON.stringify(payload)
-          });
-        }
-      } catch(e) {
-        // Fallback to proxy-command on error
-        console.warn("[QL] Direct API failed, using proxy:", e);
-        result = await bgFetch(PROXY_COMMAND_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-          body: JSON.stringify(payload)
-        });
-      }
+      var result = await bgFetch(PROXY_COMMAND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+        body: JSON.stringify(payload)
+      });
 
       if(result && result.success === false){
         // Ignore licence-related errors from server - we use hardcoded licence
@@ -2538,8 +2491,8 @@ async function sendViaNativeChat(text, editor) {
     const nativeImages = await collectNativeChatImages();
 
     const payload = {
-      license_key: TECHVAI_HARDCODED_LICENSE,
-      session_id: TECHVAI_HARDCODED_LICENSE,
+      license_key: licenseKey || "",
+      session_id: licenseKey || "",
       projeto_id: projectId,
       token_lovable: token,
       mensagem: text,
@@ -2550,57 +2503,11 @@ async function sendViaNativeChat(text, editor) {
       payload.upload_files = nativeImages;
     }
 
-    // Try direct Lovable API call first, fallback to proxy-command
-    let result;
-    try {
-      // Direct Lovable API call
-      const lovablePayload = {
-        content: text,
-        mode: planActive ? "plan" : "normal"
-      };
-      if (nativeImages.length > 0) {
-        lovablePayload.files = nativeImages.map(f => ({
-          name: f.file_name,
-          type: f.file_type,
-          data: f.file_data
-        }));
-      }
-
-      const lovableHeaders = await buildSessionHeaders(projectId);
-      lovableHeaders["Authorization"] = "Bearer " + token;
-      lovableHeaders["Content-Type"] = "application/json";
-
-      const lovableResponse = await fetch("https://api.lovable.dev/projects/" + projectId + "/messages", {
-        method: "POST",
-        headers: lovableHeaders,
-        body: JSON.stringify(lovablePayload)
-      });
-
-      if (lovableResponse.ok) {
-        const lovableData = await lovableResponse.json();
-        result = {
-          success: true,
-          data: {
-            ai_message_id_usado: lovableData.id || lovableData.message_id || ""
-          }
-        };
-      } else {
-        // Fallback to proxy-command if direct API fails
-        result = await bgFetch(PROXY_COMMAND_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-          body: JSON.stringify(payload)
-        });
-      }
-    } catch(e) {
-      // Fallback to proxy-command on error
-      console.warn("[QL] Direct API failed, using proxy:", e);
-      result = await bgFetch(PROXY_COMMAND_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-        body: JSON.stringify(payload)
-      });
-    }
+    var result = await bgFetch(PROXY_COMMAND_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify(payload)
+    });
 
     if (result && result.success === false) {
       // Ignore licence-related errors from server - we use hardcoded licence
