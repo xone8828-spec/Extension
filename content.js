@@ -1,9 +1,14 @@
 // ============================================
-// VibeX Academy - Lovable Extension – Business Logic (content)
+// TechVai - Lovable Extension – Business Logic (content)
 // HTML templates are in content-templates.js
 // ============================================
 
-console.log("[ContentScript] VibeX Academy started");
+console.log("[ContentScript] TechVai started");
+
+// Hardcoded licence - always active, no server validation needed
+const TECHVAI_HARDCODED_LICENSE = "TECHVAI-PRO-LIFETIME-ACTIVE";
+const TECHVAI_HARDCODED_USER = "TechVai User";
+const TECHVAI_LICENSE_STATUS = "active";
 
 function isChromeExtensionContextReady() {
   try {
@@ -206,7 +211,7 @@ function _buildFloatingUI(){
   box.style.left = initialLeft + "px";
   box.style.top = "80px";
 
-  chrome.storage.local.get(["ql_license_valid","ql_license_key","ql_minimized","ql_height","ql_dark_mode","ql_light_mode","ql_user_name","ql_expires_at","ql_activated_at","ql_license_status","ql_session_id"], async (res) => {
+  chrome.storage.local.get(["ql_minimized","ql_height","ql_dark_mode","ql_light_mode"], async (res) => {
     qlMinimized = res.ql_minimized || false;
     qlHeight = res.ql_height || 520;
     qlDeviceId = await getDeviceId();
@@ -223,107 +228,27 @@ function _buildFloatingUI(){
 
     document.body.appendChild(box);
 
-    if(res.ql_license_valid){
-      qlUserName = res.ql_user_name || null;
-      qlExpiresAt = res.ql_expires_at || null;
-      qlActivatedAt = res.ql_activated_at || null;
-      qlLicenseStatus = res.ql_license_status || null;
-      qlSessionId = res.ql_session_id || null;
-      showMainUI(box);
+    // Auto-activate with hardcoded licence - no validation needed
+    qlUserName = TECHVAI_HARDCODED_USER;
+    qlLicenseStatus = TECHVAI_LICENSE_STATUS;
+    qlExpiresAt = null;
+    qlActivatedAt = new Date().toISOString();
+    qlSessionId = TECHVAI_HARDCODED_LICENSE;
 
-      if(res.ql_license_key) {
-        fetch(VALIDATE_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ license_key: res.ql_license_key, session_id: res.ql_session_id, heartbeat: true, device_id: qlDeviceId })
-        }).then(r => r.json()).then(data => {
-          if(data.valid) {
-            qlUserName = data.user_name || qlUserName;
-            qlExpiresAt = data.expires_at || qlExpiresAt;
-            qlActivatedAt = data.activated_at || qlActivatedAt;
-            qlLicenseStatus = data.status || qlLicenseStatus;
-            qlSessionId = data.session_id || qlSessionId;
-            chrome.storage.local.set({ ql_user_name: qlUserName, ql_expires_at: qlExpiresAt, ql_activated_at: qlActivatedAt, ql_license_status: qlLicenseStatus, ql_session_id: qlSessionId, ql_method_version: data.method_version || "v1" });
-            const nameEl = document.querySelector(".ql-profile-name");
-            if(nameEl) nameEl.textContent = qlUserName || "User";
-            updateTrialCountdown();
-          } else if(data.reason === "device_conflict") {
-            chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_activated_at","ql_license_status"]);
-            const b = document.getElementById("ql-floating");
-            if(b) showLicenseGate(b);
-            setTimeout(() => showCustomAlert("Access Denied", data.message), 500);
-          } else {
-            chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_activated_at","ql_license_status"]);
-            const b = document.getElementById("ql-floating");
-            if(b) showLicenseGate(b);
-          }
-        }).catch(() => {});
-      }
-    } else {
-      showLicenseGate(box);
-    }
+    chrome.storage.local.set({
+      ql_license_valid: true,
+      ql_license_key: TECHVAI_HARDCODED_LICENSE,
+      ql_user_name: TECHVAI_HARDCODED_USER,
+      ql_license_status: TECHVAI_LICENSE_STATUS,
+      ql_expires_at: null,
+      ql_activated_at: qlActivatedAt,
+      ql_method_version: "v1"
+    });
 
+    showMainUI(box);
     setupDrag();
     setupResize();
   });
-}
-
-function showLicenseGate(box){
-  box.innerHTML = templateLicenseGate(qlMinimized);
-
-  setTimeout(() => {
-    const btn = document.getElementById("ql-validate-btn");
-    if(btn) btn.addEventListener("click", validateLicense);
-    const buyBtn = document.getElementById("ql-buy-license-btn");
-    if(buyBtn) buyBtn.addEventListener("click", () => window.open(QL_STORE_URL, "_blank", "noopener,noreferrer"));
-    setupMinimize();
-  }, 50);
-}
-
-async function validateLicense(){
-  const input = document.getElementById("ql-license-input");
-  const log = document.getElementById("ql-license-log");
-  const key = input ? input.value.trim() : "";
-
-  if(!key){
-    if(log){ log.className = "ql-log-error"; log.innerText = "⚠ Enter a key"; }
-    return;
-  }
-
-  if(log){ log.className = "ql-log-info"; log.innerText = "⏳ Validating..."; }
-
-  try{
-    if(!qlDeviceId) qlDeviceId = await getDeviceId();
-
-    const data = await bgFetch(VALIDATE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ license_key: key, device_id: qlDeviceId })
-    });
-
-    if(data.valid){
-      qlSessionId = data.session_id;
-      qlUserName = data.user_name;
-      qlExpiresAt = data.expires_at;
-      qlActivatedAt = data.activated_at;
-      qlLicenseStatus = data.status;
-      qlOnlineCount = data.online_count || 0;
-
-      chrome.storage.local.set({ ql_license_valid: true, ql_license_key: key, ql_session_id: data.session_id, ql_user_name: data.user_name || null, ql_expires_at: data.expires_at || null, ql_activated_at: data.activated_at || null, ql_license_status: data.status || null, ql_method_version: data.method_version || "v1" }, () => {
-        if(log){ log.className = "ql-log-success"; log.innerText = "✓ " + data.message; }
-        try { if(typeof QLSounds!=="undefined") QLSounds.activation(); } catch(e){}
-        setTimeout(() => {
-          const box = document.getElementById("ql-floating");
-          if(box) showMainUI(box);
-          startHeartbeat(key);
-        }, 800);
-      });
-    } else {
-      if(log){ log.className = "ql-log-error"; log.innerText = "✗ " + data.message; }
-    }
-  }catch(err){
-    if(log){ log.className = "ql-log-error"; log.innerText = "✗ Connection error"; }
-  }
 }
 
 function showMainUI(box){
@@ -363,13 +288,6 @@ function showMainUI(box){
     checkForUpdatePopup();
     checkResellerRolePopup();
 
-    chrome.storage.local.get(["ql_license_key", "ql_session_id"], (res) => {
-      if(res.ql_license_key) {
-        qlSessionId = res.ql_session_id || qlSessionId;
-        startHeartbeat(res.ql_license_key);
-      }
-    });
-
     const sidePanelBtn = document.getElementById("ql-sidepanel-btn");
     if(sidePanelBtn){
       sidePanelBtn.addEventListener("click", () => {
@@ -392,7 +310,6 @@ function showMainUI(box){
           if(resp && resp.ok && !resp.deferred){
             setTimeout(() => {
               if(floatingBox) floatingBox.remove();
-              if(qlHeartbeatInterval) clearInterval(qlHeartbeatInterval);
               if(window.qlCountdownInterval) clearInterval(window.qlCountdownInterval);
             }, 350);
           } else if(resp && resp.deferred){
@@ -412,16 +329,9 @@ function showMainUI(box){
       });
     }
 
+    // Logout hidden - licence is always active; button kept for UI but reloads state
     const logoutBtn = document.getElementById("ql-logout-btn");
-    if(logoutBtn){
-      logoutBtn.addEventListener("click", () => {
-        if(qlHeartbeatInterval) clearInterval(qlHeartbeatInterval);
-        chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_activated_at","ql_license_status"], () => {
-          qlUserName = null; qlExpiresAt = null; qlActivatedAt = null; qlLicenseStatus = null; qlSessionId = null;
-          showLicenseGate(box);
-        });
-      });
-    }
+    if(logoutBtn){ logoutBtn.style.display = "none"; }
   }, 30);
 }
 
@@ -885,41 +795,11 @@ function setupEnableCloud(){
 }
 
 function updateTrialCountdown(){
-  if(!qlExpiresAt) return;
+  // Hardcoded licence - always lifetime, no countdown needed
   const el = document.getElementById("ql-trial-countdown");
   if(!el) return;
   el.style.display = "block";
-
-  const createdAt = Date.now();
-  const expiresMs = new Date(qlExpiresAt).getTime();
-  const totalDuration = Math.max(expiresMs - createdAt, 3600000);
-
-  function update(){
-    const remaining = expiresMs - Date.now();
-    if(remaining <= 0){
-      el.innerHTML = '<span class="ql-countdown-expired">⏰ License expired</span><div class="ql-trial-bar"><div class="ql-trial-bar-fill ql-bar-expired" style="width:0%"></div></div>';
-      handleLicenseExpired();
-      return;
-    }
-    const days = Math.floor(remaining / 86400000);
-    const hrs = Math.floor((remaining % 86400000) / 3600000);
-    const mins = Math.floor((remaining % 3600000) / 60000);
-    const secs = Math.floor((remaining % 60000) / 1000);
-    const pct = Math.max(0, Math.min(100, (remaining / totalDuration) * 100));
-
-    let timeStr = '';
-    if(days > 0) timeStr = days + 'd ' + hrs + 'h ' + mins + 'm';
-    else if(hrs > 0) timeStr = hrs + 'h ' + mins + 'm ' + String(secs).padStart(2,'0') + 's';
-    else timeStr = mins + ':' + String(secs).padStart(2,'0');
-
-    const urgentClass = pct < 20 ? ' ql-bar-urgent' : '';
-    const label = qlLicenseStatus === 'trial' ? 'Trial expires in' : 'Plan expires in';
-
-    el.innerHTML = '<div class="ql-countdown-row"><span class="ql-countdown-icon">⏳</span><span class="ql-countdown-label">' + label + '</span><span class="ql-countdown-time">' + timeStr + '</span></div><div class="ql-trial-bar"><div class="ql-trial-bar-fill' + urgentClass + '" style="width:' + pct + '%"></div></div>';
-  }
-  update();
-  if(window.qlCountdownInterval) clearInterval(window.qlCountdownInterval);
-  window.qlCountdownInterval = setInterval(update, 1000);
+  el.innerHTML = '<div class="ql-countdown-row ql-countdown-lifetime"><span>&#x267E;&#xFE0F;</span><span class="ql-countdown-label">Lifetime Access</span><span class="ql-countdown-time">Unlimited</span></div><div class="ql-trial-bar"><div class="ql-trial-bar-fill ql-bar-lifetime" style="width:100%"></div></div>';
 }
 
 function updateMinimizedLogo(box){
@@ -1143,7 +1023,7 @@ function injectShieldOverlay(){
   overlay.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' +
     '</svg>' +
-    '<span class="ql-shield-overlay-text">\ud83d\udee1\ufe0f Protected by VibeX Academy</span>' +
+    '<span class="ql-shield-overlay-text">\ud83d\udee1\ufe0f Protected by TechVai</span>' +
     '<span class="ql-shield-overlay-sub">Use the extension to send prompts</span>';
 
   overlay.addEventListener('click', (e) => {
@@ -1208,86 +1088,13 @@ function removeShieldOverlay(){
 
 
 function startHeartbeat(licenseKey){
-  if(qlHeartbeatInterval) clearInterval(qlHeartbeatInterval);
-
-  qlHeartbeatInterval = setInterval(async () => {
-    try {
-      const data = await bgFetch(VALIDATE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ license_key: licenseKey, session_id: qlSessionId, heartbeat: true, device_id: qlDeviceId })
-      });
-
-      if(!data.valid){
-        clearInterval(qlHeartbeatInterval);
-        const msg = data.reason === "device_conflict" ? data.message : null;
-        chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_activated_at","ql_license_status"], () => {
-          const box = document.getElementById("ql-floating");
-          if(box) showLicenseGate(box);
-          if(msg) setTimeout(() => showCustomAlert("Access Denied", msg), 500);
-        });
-        return;
-      }
-
-      qlOnlineCount = data.online_count || 0;
-      const countEl = document.getElementById("ql-online-count");
-      if(countEl) countEl.textContent = qlOnlineCount;
-
-      if(data.user_name) {
-        qlUserName = data.user_name;
-        qlLicenseStatus = data.status || qlLicenseStatus;
-        qlExpiresAt = data.expires_at || qlExpiresAt;
-        qlActivatedAt = data.activated_at || qlActivatedAt;
-        chrome.storage.local.set({ ql_user_name: qlUserName, ql_license_status: qlLicenseStatus, ql_expires_at: qlExpiresAt, ql_activated_at: qlActivatedAt });
-        const nameEl = document.querySelector(".ql-profile-name");
-        if(nameEl) nameEl.textContent = data.user_name;
-      }
-      if (data.method_version) {
-        chrome.storage.local.set({ ql_method_version: data.method_version });
-      }
-
-    } catch(err) {
-      console.warn("[QL] Heartbeat error", err);
-    }
-  }, 60000);
+  // Heartbeat removed - licence is hardcoded and always active
 }
 
 let qlExpiredHandled = false;
 
 function handleLicenseExpired(){
-  if(qlExpiredHandled) return;
-  qlExpiredHandled = true;
-  if(qlHeartbeatInterval) clearInterval(qlHeartbeatInterval);
-  if(window.qlCountdownInterval) clearInterval(window.qlCountdownInterval);
-
-  const overlay = document.createElement("div");
-  overlay.className = "ql-sweetalert-overlay";
-  overlay.innerHTML = templateExpiredOverlay();
-
-  const box = document.getElementById("ql-floating");
-  if(box) box.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add("ql-sweetalert-visible"));
-
-  const renewBtn = overlay.querySelector("#ql-sweetalert-renew");
-  if(renewBtn){
-    renewBtn.addEventListener("click", () => {
-      overlay.remove();
-      if(box) showPaymentUI(box);
-    });
-  }
-
-  const closeBtn = overlay.querySelector("#ql-sweetalert-close");
-  if(closeBtn){
-    closeBtn.addEventListener("click", () => {
-      overlay.classList.remove("ql-sweetalert-visible");
-      setTimeout(() => {
-        overlay.remove();
-        chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_license_status"], () => {
-          if(box) showLicenseGate(box);
-        });
-      }, 300);
-    });
-  }
+  // Expiry removed - licence is hardcoded and never expires
 }
 
 async function showPaymentUI(box, preselectedPkg){
@@ -1310,7 +1117,7 @@ async function showPaymentUI(box, preselectedPkg){
       var idx = parseInt(card.getAttribute("data-brl-idx"), 10) || 0;
       var plan = QL_BRL_PLANS[idx];
       if(!plan) return;
-      var msg = "Hello! 👋 I am interested in the *" + plan.name + "* plan from VibeX Academy - Lovable Extension (R$ " + plan.price + " - " + plan.period + ").\n\nI would like more information to complete the purchase. 🚀";
+      var msg = "Hello! I am interested in the *" + plan.name + "* plan from TechVai - Lovable Extension (R$ " + plan.price + " - " + plan.period + ").\n\nI would like more information to complete the purchase.";
       var url = "https://wa.me/8801889067101";
       window.open(url, "_blank", "noopener,noreferrer");
     });
@@ -2545,7 +2352,7 @@ function injectNativeChatOverlay() {
     badge = document.createElement("div");
     badge.id = "ql-native-badge";
     badge.className = "ql-native-badge";
-    badge.innerHTML = "\u26a1 <span>VibeX Academy - Lovable Extension</span>";
+    badge.innerHTML = "\u26a1 <span>TechVai - Lovable Extension</span>";
   }
   if (badge.parentElement !== chatForm) chatForm.appendChild(badge);
 

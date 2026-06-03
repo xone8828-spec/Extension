@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "VibeX Academy - Lovable Extension",
+  "name": "TechVai - Lovable Extension",
    "version": "6.0.13",
-  "description": "Premium extension with license validation, plan mode, and smart automation.",
+  "description": "TechVai premium extension with plan mode and smart automation for Lovable.",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "sidePanel", "cookies"],
   "host_permissions": [
     "https://*.lovable.dev/*",
@@ -19,7 +19,7 @@
     "128": "images/icon128.png"
   },
   "action": {
-    "default_title": "VibeX Academy - Lovable Extension",
+    "default_title": "TechVai - Lovable Extension",
     "default_icon": {
       "16": "images/icon16.png",
       "48": "images/icon48.png",
