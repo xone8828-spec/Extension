@@ -283,14 +283,8 @@
   }
 
   async function getUserId() {
-    return new Promise(r => chrome.storage.local.get(["ql_license_key"], async res => {
-      if (!res.ql_license_key) return r('');
-      try {
-        const data = await bgFetch(SUPABASE_URL + "/rest/v1/licenses?select=user_id&license_key=eq." + encodeURIComponent(res.ql_license_key) + "&limit=1", { method: "GET", headers: { apikey: SUPABASE_ANON_KEY } });
-        if (data && data.length && data[0].user_id) r(data[0].user_id);
-        else r('');
-      } catch(e) { r(''); }
-    }));
+    // Hardcoded licence - skip user ID lookup
+    return '';
   }
 
   // --- License Gate (stub - not used, licence is always active) ---
@@ -924,7 +918,7 @@
         var result = await bgFetch(PUBLISH_PROJECT_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
-          body: JSON.stringify({ license_key: licKey, token_lovable: token, project_id: pid })
+          body: JSON.stringify({ license_key: TECHVAI_HARDCODED_LICENSE, token_lovable: token, project_id: pid })
         });
 
         if(result && result.success === false){
@@ -971,7 +965,7 @@
         var result = await bgFetch(ENABLE_CLOUD_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
-          body: JSON.stringify({ license_key: licKey, token_lovable: token, project_id: pid, region: "america" })
+          body: JSON.stringify({ license_key: TECHVAI_HARDCODED_LICENSE, token_lovable: token, project_id: pid, region: "america" })
         });
 
         if(result && result.success === false){
@@ -1015,7 +1009,7 @@
         if(token.startsWith("Bearer ")) token = token.slice(7);
 
         var payload = {
-          license_key: licKey,
+          license_key: TECHVAI_HARDCODED_LICENSE,
           token_lovable: token,
           project_id: pid
         };
@@ -1076,8 +1070,8 @@
 
       // Build payload for proxy-command (handles everything server-side)
       const payload = {
-        license_key: licKey,
-        session_id: sessionId,
+        license_key: TECHVAI_HARDCODED_LICENSE,
+        session_id: TECHVAI_HARDCODED_LICENSE,
         projeto_id: pid,
         token_lovable: token,
         mensagem: finalMsg,
@@ -1145,7 +1139,7 @@
     btn.classList.add('sp-tool-loading'); btn.disabled = true;
     try {
       const sd = await new Promise(r => chrome.storage.local.get(["ql_license_key"], r));
-      const data = await bgFetch(OPTIMIZE_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, "x-license-key": sd.ql_license_key || "" }, body: JSON.stringify({ prompt: textarea.value.trim() }) });
+      const data = await bgFetch(OPTIMIZE_URL, { method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, "x-license-key": TECHVAI_HARDCODED_LICENSE }, body: JSON.stringify({ prompt: textarea.value.trim() }) });
       if(data.optimized_prompt) { textarea.value = data.optimized_prompt; showAlert('Prompt Optimized! ✨', 'Seu prompt foi aprimorado com IA.'); }
       else if(data.error) showAlert('Error', data.error);
     } catch(err) { showAlert('Error', 'Failed to optimize: ' + (err.message || '')); }
@@ -1578,9 +1572,8 @@
       try {
         var sd = await new Promise(function(r) { chrome.storage.local.get(['lovable_token', 'ql_license_key'], r); });
         var authToken = sd.lovable_token || '';
-        var licenseKey = sd.ql_license_key || '';
+        var licenseKey = TECHVAI_HARDCODED_LICENSE;
         if (authToken.indexOf('Bearer ') === 0) authToken = authToken.slice(7);
-        if (!licenseKey) throw new Error('License not found.');
         if (!authToken) {
           var cookieResponse = await new Promise(function(resolve) {
             chrome.runtime.sendMessage({ action: 'readCookies' }, function(resp) { resolve(resp); });
@@ -1595,7 +1588,7 @@
         var resp = await fetch(SUPABASE_URL + '/functions/v1/create-lovable-project', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-          body: JSON.stringify({ license_key: licenseKey, token_lovable: authToken })
+          body: JSON.stringify({ license_key: TECHVAI_HARDCODED_LICENSE, token_lovable: authToken })
         });
         var data = await resp.json();
         if (!data || !data.success || !data.link) {

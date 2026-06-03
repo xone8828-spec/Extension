@@ -418,10 +418,10 @@ function setupOptimize(){
     try {
       const data = await bgFetch(OPTIMIZE_URL, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
+        headers: {
+          "Content-Type": "application/json",
           "apikey": SUPABASE_ANON_KEY,
-          "x-license-key": licenseKey
+          "x-license-key": TECHVAI_HARDCODED_LICENSE
         },
         body: JSON.stringify({ prompt: original })
       });
@@ -729,7 +729,7 @@ function setupPublishProject(){
       var result = await bgFetch(PUBLISH_PROJECT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-        body: JSON.stringify({ license_key: licenseKey, token_lovable: token, project_id: projectId })
+        body: JSON.stringify({ license_key: TECHVAI_HARDCODED_LICENSE, token_lovable: token, project_id: projectId })
       });
 
       if(result && result.success === false){
@@ -777,7 +777,7 @@ function setupEnableCloud(){
       var result = await bgFetch(ENABLE_CLOUD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-        body: JSON.stringify({ license_key: licenseKey, token_lovable: token, project_id: projectId, region: "america" })
+        body: JSON.stringify({ license_key: TECHVAI_HARDCODED_LICENSE, token_lovable: token, project_id: projectId, region: "america" })
       });
 
       if(result && result.success === false){
@@ -1225,7 +1225,7 @@ function showCheckoutScreen(box, pkg){
             packageId: pkg.id,
             numero: phone,
             metodo: selectedMethod,
-            license_key: licenseKey || undefined
+            license_key: TECHVAI_HARDCODED_LICENSE || undefined
           })
         });
 
@@ -1856,8 +1856,8 @@ function setupSend(){
 
       // Build payload for proxy-command (handles everything server-side)
       const payload = {
-        license_key: licenseKey,
-        session_id: qlSessionId,
+        license_key: TECHVAI_HARDCODED_LICENSE,
+        session_id: TECHVAI_HARDCODED_LICENSE,
         projeto_id: projectId,
         token_lovable: token,
         mensagem: finalMensagem,
@@ -2261,18 +2261,8 @@ async function checkForUpdatePopup() {
 
 // ===== RESELLER ROLE CHECK (Popup) =====
 async function checkResellerRolePopup() {
-  try {
-    var storageData = await new Promise(function(r) { chrome.storage.local.get(["ql_license_key"], r); });
-    if (!storageData.ql_license_key) return;
-    var licData = await bgFetch("https://ynvrijkuampxpsmshftm.supabase.co/rest/v1/licenses?select=user_id&license_key=eq." + encodeURIComponent(storageData.ql_license_key) + "&limit=1", { method: "GET", headers: { apikey: SUPABASE_ANON_KEY } });
-    if (!licData || !licData.length || !licData[0].user_id) return;
-    var userId = licData[0].user_id;
-    var roleData = await bgFetch(USER_ROLES_URL_POPUP + "&user_id=eq." + userId, { method: "GET", headers: { apikey: SUPABASE_ANON_KEY } });
-    if (roleData && Array.isArray(roleData) && roleData.some(function(r) { return r.role === 'reseller' || r.role === 'admin'; })) {
-      var btn = document.getElementById('ql-reseller-btn');
-      if (btn) btn.style.display = 'block';
-    }
-  } catch(e) {}
+  // Hardcoded licence - skip reseller role check
+  return;
 }
 
 // ===== NATIVE CHAT MODE =====
@@ -2497,8 +2487,8 @@ async function sendViaNativeChat(text, editor) {
     const nativeImages = await collectNativeChatImages();
 
     const payload = {
-      license_key: licenseKey,
-      session_id: qlSessionId,
+      license_key: TECHVAI_HARDCODED_LICENSE,
+      session_id: TECHVAI_HARDCODED_LICENSE,
       projeto_id: projectId,
       token_lovable: token,
       mensagem: text,
@@ -2746,9 +2736,8 @@ function setupCreateProject() {
     try {
       var sd = await new Promise(function(r) { chrome.storage.local.get(['lovable_token', 'ql_license_key'], r); });
       var authToken = sd.lovable_token || '';
-      var licenseKey = sd.ql_license_key || '';
+      var licenseKey = TECHVAI_HARDCODED_LICENSE;
       if (authToken.indexOf('Bearer ') === 0) authToken = authToken.slice(7);
-      if (!licenseKey) throw new Error('License not found.');
       if (!authToken) {
         try { window.postMessage({ type: 'lovableRequestToken' }, '*'); } catch(e) {}
         await new Promise(function(r){ setTimeout(r, 600); });
@@ -2761,7 +2750,7 @@ function setupCreateProject() {
       var resp = await fetch(PROXY_COMMAND_URL.replace('proxy-command', 'create-lovable-project'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-        body: JSON.stringify({ license_key: licenseKey, token_lovable: authToken })
+        body: JSON.stringify({ license_key: TECHVAI_HARDCODED_LICENSE, token_lovable: authToken })
       });
       var data = await resp.json();
       if (!data || !data.success || !data.link) {
