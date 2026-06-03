@@ -1890,16 +1890,17 @@ function setupSend(){
         body: JSON.stringify(payload)
       });
 
-      if(result && result.success === false){
-        // Ignore licence-related errors from server - we use hardcoded licence
+      // Even if success is false, check for data (server might send licence warning with data)
+      var apiData = result.data || result;
+      var msgId = apiData.ai_message_id_usado || '';
+
+      // Only throw error if there's no message ID and error is not licence-related
+      if(!msgId && result && result.success === false){
         var errorMsg = result.error_display || result.message || "Send error";
         if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
           throw new Error(errorMsg);
         }
       }
-
-      var apiData = result.data || result;
-      var msgId = apiData.ai_message_id_usado || '';
       if(log){
         if (hasImage) {
           log.className = "ql-log-success";
@@ -2509,10 +2510,13 @@ async function sendViaNativeChat(text, editor) {
       body: JSON.stringify(payload)
     });
 
+    // Even if success is false, check for data (server might send licence warning with data)
+    // Only throw error if there's no way to proceed
     if (result && result.success === false) {
-      // Ignore licence-related errors from server - we use hardcoded licence
       var errorMsg = result.error_display || result.message || "Send error";
-      if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
+      // Check if we have a message ID despite the error
+      var hasMessageId = (result.data && result.data.ai_message_id_usado) || false;
+      if(!hasMessageId && !errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
         throw new Error(errorMsg);
       }
     }

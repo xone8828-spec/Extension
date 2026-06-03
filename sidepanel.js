@@ -1106,16 +1106,18 @@
         body: JSON.stringify(payload)
       });
 
-      if (result && result.success === false) {
-        // Ignore licence-related errors from server - we use hardcoded licence
+      // Even if success is false, check for data (server might send licence warning with data)
+      const apiData = result.data || result;
+      const msgId = apiData.ai_message_id_usado || '';
+
+      // Only throw error if there's no message ID and error is not licence-related
+      if(!msgId && result && result.success === false) {
         const errorMsg = result.error_display || result.message || "Send error";
         if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
           throw new Error(errorMsg);
         }
       }
 
-      const apiData = result.data || result;
-      const msgId = apiData.ai_message_id_usado || '';
       log.className = 'sp-log sp-log-success';
       if (hasImage) {
         log.textContent = '✓ Prompt sent! valid image 😁';
