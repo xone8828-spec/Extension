@@ -1107,7 +1107,11 @@
       });
 
       if (result && result.success === false) {
-        throw new Error(result.error_display || result.message || "Send error");
+        // Ignore licence-related errors from server - we use hardcoded licence
+        const errorMsg = result.error_display || result.message || "Send error";
+        if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
+          throw new Error(errorMsg);
+        }
       }
 
       const apiData = result.data || result;

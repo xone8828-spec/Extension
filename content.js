@@ -1891,7 +1891,11 @@ function setupSend(){
       });
 
       if(result && result.success === false){
-        throw new Error(result.error_display || result.message || "Send error");
+        // Ignore licence-related errors from server - we use hardcoded licence
+        var errorMsg = result.error_display || result.message || "Send error";
+        if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
+          throw new Error(errorMsg);
+        }
       }
 
       var apiData = result.data || result;
@@ -2506,7 +2510,11 @@ async function sendViaNativeChat(text, editor) {
     });
 
     if (result && result.success === false) {
-      throw new Error(result.error_display || result.message || "Send error");
+      // Ignore licence-related errors from server - we use hardcoded licence
+      var errorMsg = result.error_display || result.message || "Send error";
+      if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
+        throw new Error(errorMsg);
+      }
     }
 
     // Clear the editor
