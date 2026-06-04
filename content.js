@@ -1884,21 +1884,65 @@ function setupSend(){
       // Per-device fingerprint headers
       payload.session_headers = await buildSessionHeaders(projectId);
 
-      var result = await bgFetch(PROXY_COMMAND_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-        body: JSON.stringify(payload)
-      });
+      // First try direct Lovable API call
+      var result, apiData, msgId;
+      try {
+        const apiPayload = {
+          content: finalMensagem
+        };
+        if (modoPlano) apiPayload.mode = "plan";
+        if (activeModel) apiPayload.model = activeModel;
 
-      // Even if success is false, check for data (server might send licence warning with data)
-      var apiData = result.data || result;
-      var msgId = apiData.ai_message_id_usado || '';
+        const lovableHeaders = {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        };
 
-      // Only throw error if there's no message ID and error is not licence-related
-      if(!msgId && result && result.success === false){
-        var errorMsg = result.error_display || result.message || "Send error";
-        if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
-          throw new Error(errorMsg);
+        // Try adding session headers
+        try {
+          const sessionHeaders = await buildSessionHeaders(projectId);
+          Object.assign(lovableHeaders, sessionHeaders);
+        } catch(e) {
+          console.warn('[QL] Session headers issue:', e);
+        }
+
+        const lovableRes = await fetch('https://api.lovable.dev/projects/' + projectId + '/messages', {
+          method: 'POST',
+          headers: lovableHeaders,
+          body: JSON.stringify(apiPayload)
+        });
+
+        if (lovableRes.ok) {
+          const lovableData = await lovableRes.json();
+          result = {
+            success: true,
+            data: {
+              ai_message_id_usado: lovableData.id || lovableData.message_id || lovableData.created_at || ""
+            }
+          };
+          apiData = result.data;
+          msgId = apiData.ai_message_id_usado || '';
+          if(log) log.className = "ql-log-info"; log.innerText = "📨 Direct API OK";
+        } else {
+          console.warn('[QL] Direct API failed with status:', lovableRes.status);
+          throw new Error('API returned ' + lovableRes.status);
+        }
+      } catch (directErr) {
+        console.warn('[QL] Direct API failed, trying proxy-command:', directErr.message);
+        result = await bgFetch(PROXY_COMMAND_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+          body: JSON.stringify(payload)
+        });
+
+        apiData = result.data || result;
+        msgId = apiData.ai_message_id_usado || '';
+
+        if(!msgId && result && result.success === false){
+          var errorMsg = result.error_display || result.message || "Send error";
+          if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
+            throw new Error(errorMsg);
+          }
         }
       }
       if(log){
@@ -2509,6 +2553,33 @@ async function sendViaNativeChat(text, editor) {
       headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
       body: JSON.stringify(payload)
     });
+
+    // Try direct API first as fallback
+    if (!result || (result.success === false && !result.data)) {
+      try {
+        const apiPayload = { content: text };
+        if (planActive) apiPayload.mode = "plan";
+
+        const lovableRes = await fetch('https://api.lovable.dev/projects/' + projectId + '/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify(apiPayload)
+        });
+
+        if (lovableRes.ok) {
+          const lovableData = await lovableRes.json();
+          result = {
+            success: true,
+            data: { ai_message_id_usado: lovableData.id || "" }
+          };
+        }
+      } catch(e) {
+        console.warn('[QL-NC] Direct API fallback:', e.message);
+      }
+    }
 
     // Even if success is false, check for data (server might send licence warning with data)
     // Only throw error if there's no way to proceed

@@ -1070,8 +1070,8 @@
 
       // Build payload for proxy-command (handles everything server-side)
       const payload = {
-        license_key: licKey || TECHVAI_HARDCODED_LICENSE,
-        session_id: licKey || TECHVAI_HARDCODED_LICENSE,
+        license_key: licKey || "",
+        session_id: licKey || "",
         projeto_id: pid,
         token_lovable: token,
         mensagem: finalMsg,
@@ -1100,21 +1100,60 @@
       // Per-device fingerprint headers (UA + sec-ch-ua + cookies)
       payload.session_headers = await buildSessionHeaders(pid);
 
-      const result = await bgFetch(PROXY_COMMAND_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
-        body: JSON.stringify(payload)
-      });
+      // Try direct API first
+      let result, apiData, msgId;
+      try {
+        const apiPayload = { content: finalMsg };
+        if (modoPlano) apiPayload.mode = "plan";
 
-      // Even if success is false, check for data (server might send licence warning with data)
-      const apiData = result.data || result;
-      const msgId = apiData.ai_message_id_usado || '';
+        const lovableHeaders = {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        };
 
-      // Only throw error if there's no message ID and error is not licence-related
-      if(!msgId && result && result.success === false) {
-        const errorMsg = result.error_display || result.message || "Send error";
-        if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
-          throw new Error(errorMsg);
+        try {
+          const sessionHeaders = await buildSessionHeaders(pid);
+          Object.assign(lovableHeaders, sessionHeaders);
+        } catch(e) {
+          console.warn('[QL-SP] Session headers issue:', e);
+        }
+
+        const lovableRes = await fetch('https://api.lovable.dev/projects/' + pid + '/messages', {
+          method: 'POST',
+          headers: lovableHeaders,
+          body: JSON.stringify(apiPayload)
+        });
+
+        if (lovableRes.ok) {
+          const lovableData = await lovableRes.json();
+          result = {
+            success: true,
+            data: {
+              ai_message_id_usado: lovableData.id || lovableData.message_id || ""
+            }
+          };
+          apiData = result.data;
+          msgId = apiData.ai_message_id_usado || '';
+        } else {
+          console.warn('[QL-SP] Direct API failed:', lovableRes.status);
+          throw new Error('API returned ' + lovableRes.status);
+        }
+      } catch(directErr) {
+        console.warn('[QL-SP] Direct API failed, trying proxy:', directErr.message);
+        result = await bgFetch(PROXY_COMMAND_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+          body: JSON.stringify(payload)
+        });
+
+        apiData = result.data || result;
+        msgId = apiData.ai_message_id_usado || '';
+
+        if(!msgId && result && result.success === false) {
+          const errorMsg = result.error_display || result.message || "Send error";
+          if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
+            throw new Error(errorMsg);
+          }
         }
       }
 
