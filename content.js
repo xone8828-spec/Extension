@@ -1881,59 +1881,27 @@ function setupSend(){
         if (uploadFiles.length > 0) payload.upload_files = uploadFiles;
       }
 
-      // First try direct Lovable API call
-      var result, apiData, msgId;
-      try {
-        const apiPayload = {
-          content: finalMensagem
-        };
-        if (modoPlano) apiPayload.mode = "plan";
-        if (activeModel) apiPayload.model = activeModel;
+      console.log('[QL] Sending to proxy-command with payload:', {
+        projeto_id: projectId,
+        mensagem: finalMensagem.substring(0, 50) + '...',
+        token_lovable: token.substring(0, 20) + '...'
+      });
 
-        const lovableRes = await fetch('https://api.lovable.dev/projects/' + projectId + '/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token
-          },
-          body: JSON.stringify(apiPayload)
-        });
+      var result = await bgFetch(PROXY_COMMAND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
+        body: JSON.stringify(payload)
+      });
 
-        console.log('[QL] Direct API response:', lovableRes.status);
+      console.log('[QL] Proxy response:', result);
 
-        if (lovableRes.ok) {
-          const lovableData = await lovableRes.json();
-          result = {
-            success: true,
-            data: {
-              ai_message_id_usado: lovableData.id || lovableData.message_id || ""
-            }
-          };
-          apiData = result.data;
-          msgId = apiData.ai_message_id_usado || '';
-          console.log('[QL] Direct API SUCCESS');
-        } else {
-          const errText = await lovableRes.text().catch(()=>'');
-          console.warn('[QL] Direct API failed:', lovableRes.status, errText);
-          throw new Error('Status ' + lovableRes.status);
-        }
-      } catch (directErr) {
-        console.warn('[QL] Direct API exception:', directErr.message);
-        // Fallback to proxy
-        result = await bgFetch(PROXY_COMMAND_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-          body: JSON.stringify(payload)
-        });
+      var apiData = result.data || result;
+      var msgId = apiData.ai_message_id_usado || '';
 
-        apiData = result.data || result;
-        msgId = apiData.ai_message_id_usado || '';
-
-        if(!msgId && result && result.success === false){
-          var errorMsg = result.error_display || result.message || "Send error";
-          if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
-            throw new Error(errorMsg);
-          }
+      if(!msgId && result && result.success === false){
+        var errorMsg = result.error_display || result.message || "Send error";
+        if(!errorMsg.includes("Licença") && !errorMsg.includes("license") && !errorMsg.includes("License")) {
+          throw new Error(errorMsg);
         }
       }
 
