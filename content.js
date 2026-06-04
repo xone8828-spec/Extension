@@ -1881,9 +1881,6 @@ function setupSend(){
         if (uploadFiles.length > 0) payload.upload_files = uploadFiles;
       }
 
-      // Per-device fingerprint headers
-      payload.session_headers = await buildSessionHeaders(projectId);
-
       // First try direct Lovable API call
       var result, apiData, msgId;
       try {
@@ -1939,7 +1936,7 @@ function setupSend(){
           }
         }
       }
-      }
+
       if(log){
         if (hasImage) {
           log.className = "ql-log-success";
