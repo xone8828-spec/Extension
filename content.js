@@ -1893,42 +1893,36 @@ function setupSend(){
         if (modoPlano) apiPayload.mode = "plan";
         if (activeModel) apiPayload.model = activeModel;
 
-        const lovableHeaders = {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token
-        };
-
-        // Try adding session headers
-        try {
-          const sessionHeaders = await buildSessionHeaders(projectId);
-          Object.assign(lovableHeaders, sessionHeaders);
-        } catch(e) {
-          console.warn('[QL] Session headers issue:', e);
-        }
-
         const lovableRes = await fetch('https://api.lovable.dev/projects/' + projectId + '/messages', {
           method: 'POST',
-          headers: lovableHeaders,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
           body: JSON.stringify(apiPayload)
         });
+
+        console.log('[QL] Direct API response:', lovableRes.status);
 
         if (lovableRes.ok) {
           const lovableData = await lovableRes.json();
           result = {
             success: true,
             data: {
-              ai_message_id_usado: lovableData.id || lovableData.message_id || lovableData.created_at || ""
+              ai_message_id_usado: lovableData.id || lovableData.message_id || ""
             }
           };
           apiData = result.data;
           msgId = apiData.ai_message_id_usado || '';
-          if(log) log.className = "ql-log-info"; log.innerText = "📨 Direct API OK";
+          console.log('[QL] Direct API SUCCESS');
         } else {
-          console.warn('[QL] Direct API failed with status:', lovableRes.status);
-          throw new Error('API returned ' + lovableRes.status);
+          const errText = await lovableRes.text().catch(()=>'');
+          console.warn('[QL] Direct API failed:', lovableRes.status, errText);
+          throw new Error('Status ' + lovableRes.status);
         }
       } catch (directErr) {
-        console.warn('[QL] Direct API failed, trying proxy-command:', directErr.message);
+        console.warn('[QL] Direct API exception:', directErr.message);
+        // Fallback to proxy
         result = await bgFetch(PROXY_COMMAND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
@@ -1944,6 +1938,7 @@ function setupSend(){
             throw new Error(errorMsg);
           }
         }
+      }
       }
       if(log){
         if (hasImage) {
@@ -2557,6 +2552,7 @@ async function sendViaNativeChat(text, editor) {
     // Try direct API first as fallback
     if (!result || (result.success === false && !result.data)) {
       try {
+        console.log('[QL-NC] Trying direct API...');
         const apiPayload = { content: text };
         if (planActive) apiPayload.mode = "plan";
 
@@ -2569,12 +2565,15 @@ async function sendViaNativeChat(text, editor) {
           body: JSON.stringify(apiPayload)
         });
 
+        console.log('[QL-NC] Direct API status:', lovableRes.status);
+
         if (lovableRes.ok) {
           const lovableData = await lovableRes.json();
           result = {
             success: true,
             data: { ai_message_id_usado: lovableData.id || "" }
           };
+          console.log('[QL-NC] Direct API SUCCESS');
         }
       } catch(e) {
         console.warn('[QL-NC] Direct API fallback:', e.message);

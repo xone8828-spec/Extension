@@ -1098,7 +1098,7 @@
       }
 
       // Per-device fingerprint headers (UA + sec-ch-ua + cookies)
-      payload.session_headers = await buildSessionHeaders(pid);
+      // payload.session_headers = await buildSessionHeaders(pid); // Skip this for now
 
       // Try direct API first
       let result, apiData, msgId;
@@ -1106,23 +1106,16 @@
         const apiPayload = { content: finalMsg };
         if (modoPlano) apiPayload.mode = "plan";
 
-        const lovableHeaders = {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token
-        };
-
-        try {
-          const sessionHeaders = await buildSessionHeaders(pid);
-          Object.assign(lovableHeaders, sessionHeaders);
-        } catch(e) {
-          console.warn('[QL-SP] Session headers issue:', e);
-        }
-
         const lovableRes = await fetch('https://api.lovable.dev/projects/' + pid + '/messages', {
           method: 'POST',
-          headers: lovableHeaders,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
           body: JSON.stringify(apiPayload)
         });
+
+        console.log('[QL-SP] Direct API status:', lovableRes.status);
 
         if (lovableRes.ok) {
           const lovableData = await lovableRes.json();
@@ -1134,12 +1127,12 @@
           };
           apiData = result.data;
           msgId = apiData.ai_message_id_usado || '';
+          console.log('[QL-SP] Direct API SUCCESS');
         } else {
-          console.warn('[QL-SP] Direct API failed:', lovableRes.status);
-          throw new Error('API returned ' + lovableRes.status);
+          throw new Error('API ' + lovableRes.status);
         }
       } catch(directErr) {
-        console.warn('[QL-SP] Direct API failed, trying proxy:', directErr.message);
+        console.warn('[QL-SP] Direct API failed:', directErr.message);
         result = await bgFetch(PROXY_COMMAND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
